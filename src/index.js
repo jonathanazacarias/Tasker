@@ -3,13 +3,18 @@ const { ApolloServer, gql } = require('apollo-server');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 //bcrypt for password encryption
 const bcrypt = require('bcryptjs');
+//jsonwebtoken for session token
+const jwt = require('jsonwebtoken');
 
 //require the dotenv file to get the database info
 const dotenv = require('dotenv');
 dotenv.config();
 
 //database access information from .env file
-const { DB_URI, DB_NAME } = process.env;
+const { DB_URI, DB_NAME, JWT_SECRET } = process.env;
+
+//function to encrypt user
+const getToken = (user) => jwt.sign({ id: user.id}, JWT_SECRET, { expiresIn: '7 days'});
 
 // A schema is a collection of type definitions (hence "typeDefs")
 // that together define the "shape" of queries that are executed against
@@ -75,33 +80,54 @@ const typeDefs = gql`
 `;
 
 // Resolvers define the technique for fetching the types defined in the
-// schema. This resolver retrieves books from the "books" array above. 
+// schema. 
 const resolvers = {
     Query: {
         myJobs: () => []
     },
+
     Mutation: {
         signUp: async (_, {input}, {db}) => {
             const hashedPassword = bcrypt.hashSync(input.password);
             const newUser = {
                 ...input,
-                password: hashedPassword,
+                password: hashedPassword
             }
 
             //save to database
             const result = await db.collection('Users').insertOne(newUser);
-            console.log(result);
-            // const user = result.ops[0]
-            // return {
-            //     user,
-            //     token: 'token'
-            // }
+            const someId = result.insertedId;
+            const user = await db.collection('Users').findOne({ _id: someId });
+            return {
+                user: user, 
+                token: getToken(user),
+            };
 
         },
 
-        signIn: () => {
-            
+        signIn: async (_, {input}, {db}) => {
+            const user = await db.collection('Users').findOne({ email: input.email});
+
+            //check if user email exists in the database
+            if (!user) {
+                throw new Error('Invalid credentials!');
+            }
+
+            //check if password is correct
+            const isPasswordCorrect = bcrypt.compareSync(input.password, user.password);
+            if (!isPasswordCorrect) {
+                throw new Error('Invalid credentials!')
+            }
+
+            return {
+                user: user,
+                token: getToken(user),
+            }
         }
+    },
+
+    User: {
+        id: ({_id, id}) => _id || id,
     }
 };
 
