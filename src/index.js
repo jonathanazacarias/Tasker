@@ -1,6 +1,6 @@
 //imports
 const { ApolloServer, gql } = require('apollo-server');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ObjectID, ServerApiVersion } = require('mongodb');
 //bcrypt for password encryption
 const bcrypt = require('bcryptjs');
 //jsonwebtoken for session token
@@ -14,7 +14,16 @@ dotenv.config();
 const { DB_URI, DB_NAME, JWT_SECRET } = process.env;
 
 //function to encrypt user
-const getToken = (user) => jwt.sign({ id: user.id}, JWT_SECRET, { expiresIn: '7 days'});
+const getToken = (user) => jwt.sign({ id: user._id}, JWT_SECRET, { expiresIn: '7 days'});
+//function to get iuser from token
+const getUserFromToken = async (token, db) => {
+    if (!token) {return null}
+
+    const tokenData = jwt.verify(token, JWT_SECRET);
+    if (!tokenData?.id) {return null}
+
+    return await db.collection('Users').findOne({ _id: ObjectID(tokenData.id)});
+}
 
 // A schema is a collection of type definitions (hence "typeDefs")
 // that together define the "shape" of queries that are executed against
@@ -137,15 +146,21 @@ const start = async () => {
     client.connect();
     const db = client.db(DB_NAME);
 
-    //set the context for the query (could make db global but this would not be optimal as the project grows)
-    const context = {
-        db,
-    }
-
     //only after connecting to the database will we start the server
     // The ApolloServer constructor requires two parameters: your schema
     // definition and your set of resolvers.
-    const server = new ApolloServer({ typeDefs, resolvers, context });
+    const server = new ApolloServer({ 
+        typeDefs, 
+        resolvers, 
+        context: async ({ req }) => {
+            const user = await getUserFromToken(req.headers.authorization, db);
+            console.log(user);
+            return {
+                db,
+                user,
+            }
+        },
+    });
 
     // The `listen` method launches a web server.
     server.listen().then(({ url }) => {
