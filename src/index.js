@@ -1,6 +1,6 @@
 //imports
 const { ApolloServer, gql } = require('apollo-server');
-const { MongoClient, ObjectID, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 //bcrypt for password encryption
 const bcrypt = require('bcryptjs');
 //jsonwebtoken for session token
@@ -13,16 +13,15 @@ dotenv.config();
 //database access information from .env file
 const { DB_URI, DB_NAME, JWT_SECRET } = process.env;
 
-//function to encrypt user
-const getToken = (user) => jwt.sign({ id: user._id}, JWT_SECRET, { expiresIn: '7 days'});
-//function to get iuser from token
+//function to encrypt user 
+const getToken = (user) => jwt.sign({ id: user._id}, JWT_SECRET, { expiresIn: '7 days' });
+//function to get user from token
 const getUserFromToken = async (token, db) => {
     if (!token) {return null}
-
     const tokenData = jwt.verify(token, JWT_SECRET);
     if (!tokenData?.id) {return null}
 
-    return await db.collection('Users').findOne({ _id: ObjectID(tokenData.id)});
+    return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
 // A schema is a collection of type definitions (hence "typeDefs")
@@ -30,8 +29,10 @@ const getUserFromToken = async (token, db) => {
 // your data.
 const typeDefs = gql`
   type Mutation {
-      signUp(input: SignUpInput): AuthUser!
-      signIn(input: SignInInput): AuthUser!
+      signUp(input: SignUpInput!): AuthUser!
+      signIn(input: SignInInput!): AuthUser!
+
+      createCompany(input: CompanyInput!): Company!
   }
 
   input SignUpInput {
@@ -60,6 +61,10 @@ const typeDefs = gql`
 
   type Company {
       id: ID!
+      name: String!
+  }
+
+  input CompanyInput {
       name: String!
   }
 
@@ -96,7 +101,7 @@ const resolvers = {
     },
 
     Mutation: {
-        signUp: async (_, {input}, {db}) => {
+        signUp: async (_, { input }, { db }) => {
             const hashedPassword = bcrypt.hashSync(input.password);
             const newUser = {
                 ...input,
@@ -114,8 +119,8 @@ const resolvers = {
 
         },
 
-        signIn: async (_, {input}, {db}) => {
-            const user = await db.collection('Users').findOne({ email: input.email});
+        signIn: async (_, { input }, { db }) => {
+            const user = await db.collection('Users').findOne({ email: input.email });
 
             //check if user email exists in the database
             if (!user) {
@@ -132,11 +137,36 @@ const resolvers = {
                 user: user,
                 token: getToken(user),
             }
+        },
+
+        createCompany: async(_, { input }, { db, user }) => {
+            //make sure user is authenticated
+            if (!user) {
+                throw new Error('Authentication Error. Please Sign In.')
+            }
+            
+            const newCompany = {
+                name: input.name,
+            }
+
+            const result = await db.collection('Companies').insertOne(newCompany);
+            const someId = result.insertedId;
+            const company = await db.collection('Companies').findOne({ _id: someId });
+
+            return {
+                id: someId,
+                name: company.name
+            }
+
         }
     },
 
     User: {
         id: ({_id, id}) => _id || id,
+    },
+
+    Company: {
+        id: ({ _id, id }) => _id || id,
     }
 };
 
@@ -153,8 +183,8 @@ const start = async () => {
         typeDefs, 
         resolvers, 
         context: async ({ req }) => {
+            console.log(req.headers.authorization);
             const user = await getUserFromToken(req.headers.authorization, db);
-            console.log(user);
             return {
                 db,
                 user,
