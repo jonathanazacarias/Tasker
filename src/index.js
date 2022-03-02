@@ -17,10 +17,13 @@ const { DB_URI, DB_NAME, JWT_SECRET } = process.env;
 const getToken = (user) => jwt.sign({ id: user._id}, JWT_SECRET, { expiresIn: '7 days' });
 //function to get user from token
 const getUserFromToken = async (token, db) => {
+    //if there is no token return null
     if (!token) {return null}
+    //verify user token with JWT_SECRET
     const tokenData = jwt.verify(token, JWT_SECRET);
+    //if tokendata doesnt have an id then the tokens didnt match
     if (!tokenData?.id) {return null}
-
+    //find and return the user with the matching id from the db
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
@@ -183,7 +186,6 @@ const start = async () => {
         typeDefs, 
         resolvers, 
         context: async ({ req }) => {
-            console.log(req.headers.authorization);
             const user = await getUserFromToken(req.headers.authorization, db);
             return {
                 db,
