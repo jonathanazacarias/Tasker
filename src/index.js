@@ -31,13 +31,33 @@ const getUserFromToken = async (token, db) => {
 // that together define the "shape" of queries that are executed against
 // your data.
 const typeDefs = gql`
-  type Mutation {
-      signUp(input: SignUpInput!): AuthUser!
-      signIn(input: SignInInput!): AuthUser!
+# MUTATIONS AND MUTATION RESPONSES
 
-      createCompany(input: CompanyInput!): Company!
-  }
 
+type Mutation {
+    signUp(input: SignUpInput!): AuthUser!
+    signIn(input: SignInInput!): AuthUser!
+    
+    createCompany(input: CompanyInput!): Company!
+    updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
+}
+
+interface MutationResponse {
+   code: String!
+   success: Boolean!
+   message: String!
+}
+
+type UpdateCompanyMutationResponse implements MutationResponse {
+  code: String!
+  success: Boolean!
+  message: String!
+  commpany: Company
+}
+
+# INPUTS FOR QUERIES AND MUTATIONS
+  "The input for sign up requires email: String, password: String, name: String, 
+  and provides optional input for avatar: (URL) String"
   input SignUpInput {
       email: String!
       password: String!
@@ -49,6 +69,16 @@ const typeDefs = gql`
       email: String!
       password: String!
   }
+
+  input CompanyInput {
+      name: String!
+  }
+
+  input UpdateCompanyInput {
+      name: String!
+  }
+
+# OBJECT TYPES
 
   type AuthUser {
       user: User!
@@ -64,10 +94,6 @@ const typeDefs = gql`
 
   type Company {
       id: ID!
-      name: String!
-  }
-
-  input CompanyInput {
       name: String!
   }
 
