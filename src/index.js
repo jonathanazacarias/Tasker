@@ -6,6 +6,16 @@ const bcrypt = require('bcryptjs');
 //jsonwebtoken for session token
 const jwt = require('jsonwebtoken');
 
+//merge and schema imports
+import { merge } from 'lodash';
+import { typeDef as User, resolvers as userResolvers } from './schema models/User';
+import { typeDef as Company, resolvers as companyResolvers } from './schema models/Company';
+import { typeDef as Role } from './schema models/Role';
+import { typeDef as Job } from './schema models/Job';
+import { typeDef as Location } from './schema models/Location';
+import { typeDef as Report } from './schema models/Report';
+import { typeDef as Address} from './schema models/Address';
+
 //require the dotenv file to get the database info
 const dotenv = require('dotenv');
 dotenv.config();
@@ -14,39 +24,53 @@ dotenv.config();
 const { DB_URI, DB_NAME, JWT_SECRET } = process.env;
 
 //function to encrypt user 
-const getToken = (user) => jwt.sign({ id: user._id}, JWT_SECRET, { expiresIn: '7 days' });
+const getToken = (user) => jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7 days' });
 //function to get user from token
 const getUserFromToken = async (token, db) => {
     //if there is no token return null
-    if (!token) {return null}
+    if (!token) { return null }
     //verify user token with JWT_SECRET
     const tokenData = jwt.verify(token, JWT_SECRET);
     //if tokendata doesnt have an id then the tokens didnt match
-    if (!tokenData?.id) {return null}
+    if (!tokenData?.id) { return null }
     //find and return the user with the matching id from the db
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
-// A schema is a collection of type definitions (hence "typeDefs")
-// that together define the "shape" of queries that are executed against
-// your data.
-const typeDefs = gql`
-interface MutationResponse {
-   code: String!
-   success: Boolean!
-   message: String!
-}
+//schema material that doesnt fit into a model
+const noModelDefs = gql`
+    type Mutation {
+        signUp(input: SignUpInput!): AuthUser!
+        signIn(input: SignInInput!): AuthUser!
+    }
 
-# QUERY TYPES
+    input SignUpInput {
+        email: String!
+        password: String!
+        name: String!
+        avatar: String
+    }
 
-  type Query {
-    myJobs: [Job!]!
-  }
+    input SignInInput {
+        email: String!
+        password: String!
+    }
+
+    interface MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+    }
+
+    # QUERY TYPES
+    type Query {
+        myJobs: [Job!]!
+    }
 `;
 
 // Resolvers define the technique for fetching the types defined in the
 // schema. 
-const resolvers = {
+const noModelResolvers = {
     Query: {
         myJobs: () => []
     },
@@ -64,7 +88,7 @@ const resolvers = {
             const someId = result.insertedId;
             const user = await db.collection('Users').findOne({ _id: someId });
             return {
-                user: user, 
+                user: user,
                 token: getToken(user),
             };
 
@@ -89,37 +113,15 @@ const resolvers = {
                 token: getToken(user),
             }
         },
-
-        createCompany: async(_, { input }, { db, user }) => {
-            //make sure user is authenticated
-            if (!user) {
-                throw new Error('Authentication Error. Please Sign In.')
-            }
-            
-            const newCompany = {
-                name: input.name,
-            }
-
-            const result = await db.collection('Companies').insertOne(newCompany);
-            const someId = result.insertedId;
-            const company = await db.collection('Companies').findOne({ _id: someId });
-
-            return {
-                id: someId,
-                name: company.name
-            }
-
-        }
-    },
-
-    User: {
-        id: ({_id, id}) => _id || id,
-    },
-
-    Company: {
-        id: ({ _id, id }) => _id || id,
     }
+
 };
+
+//put together all schema models and resolvers
+makeExecutableSchema({
+    typeDefs: [noModelDefs, User, Company, Location, Job, Address, Report, Role],
+    resolvers: merge(noModelResolvers, userResolvers, companyResolvers),
+});
 
 //async function to start db access
 const start = async () => {
@@ -130,9 +132,9 @@ const start = async () => {
     //only after connecting to the database will we start the server
     // The ApolloServer constructor requires two parameters: your schema
     // definition and your set of resolvers.
-    const server = new ApolloServer({ 
-        typeDefs, 
-        resolvers, 
+    const server = new ApolloServer({
+        typeDefs,
+        resolvers,
         context: async ({ req }) => {
             const user = await getUserFromToken(req.headers.authorization, db);
             return {

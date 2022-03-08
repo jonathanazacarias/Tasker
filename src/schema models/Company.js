@@ -28,3 +28,33 @@ export const typeDef = gql`
     name: String!
   }
 `;
+
+export const resolvers = {
+  Company: {
+    id: ({ _id, id }) => _id || id,
+  },
+
+  Mutation: {
+    createCompany: async (_, { input }, { db, user }) => {
+      //make sure user is authenticated
+      if (!user) {
+        throw new Error('Authentication Error. Please Sign In.')
+      }
+
+      const newCompany = {
+        name: input.name,
+      }
+
+      const result = await db.collection('Companies').insertOne(newCompany);
+      const someId = result.insertedId;
+      const company = await db.collection('Companies').findOne({ _id: someId });
+
+      return {
+        id: someId,
+        name: company.name
+      }
+
+    }
+  }
+
+};

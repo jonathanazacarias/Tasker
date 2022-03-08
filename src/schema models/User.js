@@ -27,21 +27,15 @@ export const typeDef = gql`
     user: User!
     token: String!
   }
-
-  type Mutation {
-    signUp(input: SignUpInput!): AuthUser!
-    signIn(input: SignInInput!): AuthUser!
-  }
-
-  input SignUpInput {
-    email: String!
-    password: String!
-    name: String!
-    avatar: String
-  }
-
-  input SignInInput {
-    email: String!
-    password: String!
-  }
 `;
+
+export const resolvers = {
+  User: {
+    id: ({ _id, id }) => _id || id,
+  },
+
+  Mutation: {
+    
+  }
+
+};
