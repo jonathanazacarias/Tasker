@@ -1,6 +1,6 @@
-import { gql } from "apollo-server";
+const { gql } = require("apollo-server");
 
-export const typeDef = gql`
+const typeDef = gql`
     type Job {
         id: ID!
         name: String!

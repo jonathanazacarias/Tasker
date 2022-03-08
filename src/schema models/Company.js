@@ -1,6 +1,6 @@
-import { gql } from "apollo-server";
+const { gql } = require("apollo-server");
 
-export const typeDef = gql`
+const typeDef = gql`
   type Company {
     id: ID!
     name: String!
@@ -29,7 +29,7 @@ export const typeDef = gql`
   }
 `;
 
-export const resolvers = {
+const resolvers = {
   Company: {
     id: ({ _id, id }) => _id || id,
   },

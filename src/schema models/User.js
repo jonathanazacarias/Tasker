@@ -1,6 +1,6 @@
-import { gql } from "apollo-server";
+const { gql } = require("apollo-server");
 
-export const typeDef = gql`
+const typeDef = gql`
   type User {
     id: ID!
     name: FullName!
@@ -29,13 +29,9 @@ export const typeDef = gql`
   }
 `;
 
-export const resolvers = {
+const resolvers = {
   User: {
     id: ({ _id, id }) => _id || id,
   },
-
-  Mutation: {
-    
-  }
 
 };
