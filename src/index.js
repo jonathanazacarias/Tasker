@@ -27,202 +27,209 @@ const getUserFromToken = async (token, db) => {
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
-//schema material that doesnt fit into a model
-const noModelDefs = gql`
-type User {
-    id: ID!
-    name: FullName!
-    email: String!
-    company: Company!
-    roles: [Role]!
-    avatar: String
-    bio: String
-    phone: String
-    assignedJobs: [Job]!
-    address: Address
-    schedual: Schedule
-    signUpDate: String!
-    lastModDate: String!
-}
+const typeDefs = gql`
+    type User {
+        id: ID!
+        firstName: String!
+        middleName: String
+        lastName: String!
+        email: String!
+        company: Company
+        roles: [Role]
+        avatar: String
+        bio: String
+        phone: String
+        assignedJobs: [Job]
+        address: Address
+        schedual: String
+        signUpDate: String!
+        lastModDate: String!
+    }
 
-input FullName {
-    firstName: String!
-    middleName: String
-    lastName: String!
-}
+    type AuthUser {
+        user: User!
+        token: String!
+    }
 
-type AuthUser {
-    user: User!
-    token: String!
-}
+    type Role {
+        role: String!
+    }
 
-type Role {
-    role: String!
-}
+    type Location {
+        id: ID!
+        name: String!
+        jobs: [Job]!
+        employees: [User]!
+        address: Address
+        jobParams: [String]!
+        schedule: [String]!
+    }
 
-type Location {
-    id: ID!
-    name: String!
-    jobs: [Job]!
-    employees: [Users]!
-    address: Address
-    jobParams: []!
-    schedule: []!
-}
+    type Report {
+        id: ID!
+        jobId: ID!
+        jobDateTime: String!
+        completionPercent: Int!
+        complete: Boolean!
+    }
 
-type Report {
-    id: ID!
-    jobId: ID!
-    jobDateTime: String!
-    completionPercent: Int!
-    complete: Boolean!
-}
+    type Job {
+        id: ID!
+        name: String!
+        reportRecipiants: String!
+        employees: [User]!
+        params: [String]!
+    }
 
-type Job {
-    id: ID!
-    name: String!
-    reportRecipiants: String!
-    employees: [User]!
-    params: []!
-}
+    type Address {
+        street: String!
+        city: String!
+        state: String!
+        zip: String!
+    }
 
-type Address {
-    street: String!
-    city: String!
-    state: String!
-    zip: String!
-}
+    type Company {
+        id: ID!
+        name: String!
+        employees: [User]!
+        locations: [Location]!
+    }
 
-type Company {
-    id: ID!
-    name: String!
-    employees: [User]!
-    locations: [Location]!
-}
+    input CompanyInput {
+        name: String!
+    }
 
-input CompanyInput {
-    name: String!
-}
+    input UpdateCompanyInput {
+        name: String!
+    }
 
-input UpdateCompanyInput {
-    name: String!
-}
+    type Mutation {
+        signUp(input: SignUpInput!): AuthUser!
+        signIn(input: SignInInput!): AuthUser!
 
-type Mutation {
-    signUp(input: SignUpInput!): AuthUser!
-    signIn(input: SignInInput!): AuthUser!
+        createCompany(input: CompanyInput!): Company!
+        updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
+    }
 
-    createCompany(input: CompanyInput!): Company!
-    updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
-}
+    type UpdateCompanyMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        commpany: Company
+    }
 
-type UpdateCompanyMutationResponse implements MutationResponse {
-    code: String!
-    success: Boolean!
-    message: String!
-    commpany: Company
-}
+    input SignUpInput {
+        email: String!
+        password: String!
+        firstName: String!
+        middleName: String
+        lastName: String!
+        avatar: String
+    }
 
-input SignUpInput {
-    email: String!
-    password: String!
-    name: String!
-    avatar: String
-}
+    input SignInInput {
+        email: String!
+        password: String!
+    }
 
-input SignInInput {
-    email: String!
-    password: String!
-}
+    interface MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+    }
 
-interface MutationResponse {
-    code: String!
-    success: Boolean!
-    message: String!
-}
-
-# QUERY TYPES
-type Query {
-    myJobs: [Job!]!
-}
+    # QUERY TYPES
+    type Query {
+        myJobs: [Job!]!
+    }
 `;
 
 // Resolvers define the technique for fetching the types defined in the
 // schema. 
-const noModelResolvers = {
-User: {
-    id: ({ _id, id }) => _id || id,
-},
-
-Company: {
-    id: ({ _id, id }) => _id || id,
-},
-
-Query: {
-    myJobs: () => []
-},
-
-Mutation: {
-    signUp: async (_, { input }, { db }) => {
-        const hashedPassword = bcrypt.hashSync(input.password);
-        const newUser = {
-            ...input,
-            password: hashedPassword
-        }
-
-        //save to database
-        const result = await db.collection('Users').insertOne(newUser);
-        const someId = result.insertedId;
-        const user = await db.collection('Users').findOne({ _id: someId });
-        return {
-            user: user,
-            token: getToken(user),
-        };
-
+const resolvers = {
+    User: {
+        id: ({ _id, id }) => _id || id,
     },
 
-    signIn: async (_, { input }, { db }) => {
-        const user = await db.collection('Users').findOne({ email: input.email });
-
-        //check if user email exists in the database
-        if (!user) {
-            throw new Error('Invalid credentials!');
-        }
-
-        //check if password is correct
-        const isPasswordCorrect = bcrypt.compareSync(input.password, user.password);
-        if (!isPasswordCorrect) {
-            throw new Error('Invalid credentials!')
-        }
-
-        return {
-            user: user,
-            token: getToken(user),
-        }
+    Company: {
+        id: ({ _id, id }) => _id || id,
     },
 
-    createCompany: async (_, { input }, { db, user }) => {
-        //make sure user is authenticated
-        if (!user) {
-            throw new Error('Authentication Error. Please Sign In.')
-        }
+    Query: {
+        myJobs: () => []
+    },
 
-        const newCompany = {
-            name: input.name,
-        }
+    Mutation: {
+        signUp: async (_, { input }, { db }) => {
+            const hashedPassword = bcrypt.hashSync(input.password);
+            let currentdate = new Date();
+            let datetime = currentdate.getDate() + "/"
+                + (currentdate.getMonth() + 1) + "/"
+                + currentdate.getFullYear() + " "
+                + currentdate.getHours() + ":"
+                + currentdate.getMinutes() + ":"
+                + currentdate.getSeconds();
+                
+            const newUser = {
+                ...input,
+                password: hashedPassword,
+                signUpDate: datetime,
+                lastModDate: datetime
+            }
 
-        const result = await db.collection('Companies').insertOne(newCompany);
-        const someId = result.insertedId;
-        const company = await db.collection('Companies').findOne({ _id: someId });
+            //save to database
+            const result = await db.collection('Users').insertOne(newUser);
+            const someId = result.insertedId;
+            const user = await db.collection('Users').findOne({ _id: someId });
+            return {
+                user: user,
+                token: getToken(user),
+            };
 
-        return {
-            id: someId,
-            name: company.name
+        },
+
+        signIn: async (_, { input }, { db }) => {
+            const user = await db.collection('Users').findOne({ email: input.email });
+
+            //check if user email exists in the database
+            if (!user) {
+                throw new Error('Invalid credentials!');
+            }
+
+            //check if password is correct
+            const isPasswordCorrect = bcrypt.compareSync(input.password, user.password);
+            if (!isPasswordCorrect) {
+                throw new Error('Invalid credentials!')
+            }
+
+            return {
+                user: user,
+                token: getToken(user),
+            }
+        },
+
+        createCompany: async (_, { input }, { db, user }) => {
+            //make sure user is authenticated
+            if (!user) {
+                throw new Error('Authentication Error. Please Sign In.')
+            }
+
+            const newCompany = {
+                name: input.name,
+            }
+
+            const result = await db.collection('Companies').insertOne(newCompany);
+            const someId = result.insertedId;
+            const company = await db.collection('Companies').findOne({ _id: someId });
+
+            return {
+                id: someId,
+                name: company.name
+            }
+
         }
 
     }
-
-}
 
 };
 
