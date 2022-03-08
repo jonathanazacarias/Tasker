@@ -46,13 +46,21 @@ const typeDefs = gql`
         lastModDate: String!
     }
 
+    input UpdateUserInput {
+        firstName: String
+        middleName: String
+        lastName: String
+        avatar: String
+        bio: String
+        phone: String
+        address: AddressInput
+        schedual: String
+        lastModDate: String!
+    }
+
     type AuthUser {
         user: User!
         token: String!
-    }
-
-    type Role {
-        role: String!
     }
 
     type Location {
@@ -63,6 +71,13 @@ const typeDefs = gql`
         address: Address
         jobParams: [String]!
         schedule: [String]!
+    }
+
+    input LocationInput {
+        name: String
+        address: AddressInput
+        jobParams: [String]
+        schedule: [String]
     }
 
     type Report {
@@ -81,7 +96,20 @@ const typeDefs = gql`
         params: [String]!
     }
 
+    input JobInput {
+        name: String!
+        reportRecipiants: String!
+        params: [String]!
+    }
+
     type Address {
+        street: String!
+        city: String!
+        state: String!
+        zip: String!
+    }
+
+    input AddressInput {
         street: String!
         city: String!
         state: String!
@@ -100,12 +128,14 @@ const typeDefs = gql`
     }
 
     input UpdateCompanyInput {
-        name: String!
+        name: String
     }
 
     type Mutation {
         signUp(input: SignUpInput!): AuthUser!
         signIn(input: SignInInput!): AuthUser!
+
+        updateUser(input: UpdateUserInput!): User!
 
         createCompany(input: CompanyInput!): Company!
         updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
@@ -124,12 +154,21 @@ const typeDefs = gql`
         firstName: String!
         middleName: String
         lastName: String!
+        phone: String!
         avatar: String
     }
 
     input SignInInput {
         email: String!
         password: String!
+    }
+
+    type Role {
+        role: String!
+    }
+
+    input RoleInput {
+        role: String!
     }
 
     interface MutationResponse {
@@ -162,19 +201,15 @@ const resolvers = {
     Mutation: {
         signUp: async (_, { input }, { db }) => {
             const hashedPassword = bcrypt.hashSync(input.password);
-            let currentdate = new Date();
-            let datetime = currentdate.getDate() + "/"
-                + (currentdate.getMonth() + 1) + "/"
-                + currentdate.getFullYear() + " "
-                + currentdate.getHours() + ":"
-                + currentdate.getMinutes() + ":"
-                + currentdate.getSeconds();
                 
             const newUser = {
                 ...input,
                 password: hashedPassword,
-                signUpDate: datetime,
-                lastModDate: datetime
+                $currentDate: {
+                    signUpDate: true,
+                    lastUpdated: true
+                }
+                
             }
 
             //save to database
@@ -205,6 +240,33 @@ const resolvers = {
             return {
                 user: user,
                 token: getToken(user),
+            }
+        },
+
+        updateUser: async (_, {input}, { db, user}) => {
+
+            const result = await db.collection('Users').updateOne({ _id: input.id},
+                
+            );
+            const someId = result.upsertedID;
+            const updatedUser = await db.collection('Users').findOne({ _id: someId });
+
+            return {
+                id: someId,
+                firstName: updatedUser.firstName,
+                middleName: updatedUser.middleName,
+                lastName: updatedUser.lastName,
+                email: updatedUser.email,
+                company: Company,
+                roles: [Role],
+                avatar: updatedUser.avatar,
+                bio: updatedUser.bio,
+                phone: updatedUser.phone,
+                assignedJobs: [Job],
+                address: Address,
+                schedual: updatedUser.schedual,
+                signUpDate: updatedUser.signUpDate,
+                lastModDate: updatedUser.lastModDate
             }
         },
 
