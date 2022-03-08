@@ -6,16 +6,6 @@ const bcrypt = require('bcryptjs');
 //jsonwebtoken for session token
 const jwt = require('jsonwebtoken');
 
-//merge and schema imports
-import { merge } from 'lodash';
-import { typeDef as User, resolvers as userResolvers } from './schema models/User';
-import { typeDef as Company, resolvers as companyResolvers } from './schema models/Company';
-import { typeDef as Role } from './schema models/Role';
-import { typeDef as Job } from './schema models/Job';
-import { typeDef as Location } from './schema models/Location';
-import { typeDef as Report } from './schema models/Report';
-import { typeDef as Address} from './schema models/Address';
-
 //require the dotenv file to get the database info
 const dotenv = require('dotenv');
 dotenv.config();
@@ -37,17 +27,103 @@ const getUserFromToken = async (token, db) => {
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
-//schema material that doesnt fit into a model
-const noModelDefs = gql`
+const typeDefs = gql`
+    type User {
+        id: ID!
+        firstName: String!
+        middleName: String
+        lastName: String!
+        email: String!
+        company: Company
+        roles: [Role]
+        avatar: String
+        bio: String
+        phone: String
+        assignedJobs: [Job]
+        address: Address
+        schedual: String
+        signUpDate: String!
+        lastModDate: String!
+    }
+
+    type AuthUser {
+        user: User!
+        token: String!
+    }
+
+    type Role {
+        role: String!
+    }
+
+    type Location {
+        id: ID!
+        name: String!
+        jobs: [Job]!
+        employees: [User]!
+        address: Address
+        jobParams: [String]!
+        schedule: [String]!
+    }
+
+    type Report {
+        id: ID!
+        jobId: ID!
+        jobDateTime: String!
+        completionPercent: Int!
+        complete: Boolean!
+    }
+
+    type Job {
+        id: ID!
+        name: String!
+        reportRecipiants: String!
+        employees: [User]!
+        params: [String]!
+    }
+
+    type Address {
+        street: String!
+        city: String!
+        state: String!
+        zip: String!
+    }
+
+    type Company {
+        id: ID!
+        name: String!
+        employees: [User]!
+        locations: [Location]!
+    }
+
+    input CompanyInput {
+        name: String!
+    }
+
+    input UpdateCompanyInput {
+        name: String!
+    }
+
     type Mutation {
         signUp(input: SignUpInput!): AuthUser!
         signIn(input: SignInInput!): AuthUser!
+
+        createCompany(input: CompanyInput!): Company!
+        updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
+    }
+
+    type UpdateCompanyMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        commpany: Company
     }
 
     input SignUpInput {
         email: String!
         password: String!
-        name: String!
+        firstName: String!
+        middleName: String
+        lastName: String!
         avatar: String
     }
 
@@ -70,7 +146,15 @@ const noModelDefs = gql`
 
 // Resolvers define the technique for fetching the types defined in the
 // schema. 
-const noModelResolvers = {
+const resolvers = {
+    User: {
+        id: ({ _id, id }) => _id || id,
+    },
+
+    Company: {
+        id: ({ _id, id }) => _id || id,
+    },
+
     Query: {
         myJobs: () => []
     },
@@ -78,9 +162,19 @@ const noModelResolvers = {
     Mutation: {
         signUp: async (_, { input }, { db }) => {
             const hashedPassword = bcrypt.hashSync(input.password);
+            let currentdate = new Date();
+            let datetime = currentdate.getDate() + "/"
+                + (currentdate.getMonth() + 1) + "/"
+                + currentdate.getFullYear() + " "
+                + currentdate.getHours() + ":"
+                + currentdate.getMinutes() + ":"
+                + currentdate.getSeconds();
+                
             const newUser = {
                 ...input,
-                password: hashedPassword
+                password: hashedPassword,
+                signUpDate: datetime,
+                lastModDate: datetime
             }
 
             //save to database
@@ -113,15 +207,31 @@ const noModelResolvers = {
                 token: getToken(user),
             }
         },
+
+        createCompany: async (_, { input }, { db, user }) => {
+            //make sure user is authenticated
+            if (!user) {
+                throw new Error('Authentication Error. Please Sign In.')
+            }
+
+            const newCompany = {
+                name: input.name,
+            }
+
+            const result = await db.collection('Companies').insertOne(newCompany);
+            const someId = result.insertedId;
+            const company = await db.collection('Companies').findOne({ _id: someId });
+
+            return {
+                id: someId,
+                name: company.name
+            }
+
+        }
+
     }
 
 };
-
-//put together all schema models and resolvers
-makeExecutableSchema({
-    typeDefs: [noModelDefs, User, Company, Location, Job, Address, Report, Role],
-    resolvers: merge(noModelResolvers, userResolvers, companyResolvers),
-});
 
 //async function to start db access
 const start = async () => {
