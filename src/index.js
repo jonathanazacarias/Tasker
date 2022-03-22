@@ -199,6 +199,7 @@ const typeDefs = gql`
     # QUERY TYPES
     type Query {
         myJobs: [Job!]!
+        getUserRole: String!
     }
 `;
 
@@ -214,7 +215,10 @@ const resolvers = {
     },
 
     Query: {
-        myJobs: () => []
+        myJobs: () => [],
+        getUserRole: async (_, { input }, { user }) => {
+            return user.role;
+        }
     },
 
     Mutation: {
@@ -398,7 +402,7 @@ const start = async () => {
     });
 
     // The `listen` method launches a web server.
-    server.listen().then(({ url }) => {
+    server.listen({ port: process.env.PORT || 4000 }).then(({ url }) => {
         console.log(`🚀  Server ready at ${url}`);
     });
 }
