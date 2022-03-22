@@ -30,12 +30,10 @@ const getUserFromToken = async (token, db) => {
 const typeDefs = gql`
     type User {
         id: ID!
-        firstName: String!
-        middleName: String
-        lastName: String!
+        name: Name!
         email: String!
         company: Company
-        roles: [Role]
+        role: RoleTypes!
         avatar: String
         bio: String
         phone: String
@@ -43,19 +41,43 @@ const typeDefs = gql`
         address: Address
         schedual: String
         signUpDate: String!
-        lastModDate: String!
+        lastUpdated: String!
+    }
+
+    type Name {
+        first: String!
+        middle: String
+        last: String!
+    }
+
+    input NameInput {
+        first: String!
+        middle: String
+        last: String!
+    }
+
+    enum RoleTypes {
+        TASKER
+        JOB_MANAGER
+        COMPANY_MANAGER
+        SYSTEM_MANAGER
     }
 
     input UpdateUserInput {
-        firstName: String
-        middleName: String
-        lastName: String
+        id: String!
+        name: NameUpdateInput
         avatar: String
         bio: String
         phone: String
         address: AddressInput
         schedual: String
-        lastModDate: String!
+        role: RoleTypes
+    }
+
+    input NameUpdateInput {
+        first: String
+        middle: String
+        last: String
     }
 
     type AuthUser {
@@ -135,7 +157,7 @@ const typeDefs = gql`
         signUp(input: SignUpInput!): AuthUser!
         signIn(input: SignInInput!): AuthUser!
 
-        updateUser(input: UpdateUserInput!): User!
+        updateUser(input: UpdateUserInput!): UpdateUserMutationResponse!
 
         createCompany(input: CompanyInput!): Company!
         updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
@@ -145,15 +167,20 @@ const typeDefs = gql`
         code: String!
         success: Boolean!
         message: String!
-        commpany: Company
+        company: Company
+    }
+
+    type UpdateUserMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        user: User
     }
 
     input SignUpInput {
         email: String!
         password: String!
-        firstName: String!
-        middleName: String
-        lastName: String!
+        name: NameInput!
         phone: String!
         avatar: String
     }
@@ -161,14 +188,6 @@ const typeDefs = gql`
     input SignInInput {
         email: String!
         password: String!
-    }
-
-    type Role {
-        role: String!
-    }
-
-    input RoleInput {
-        role: String!
     }
 
     interface MutationResponse {
@@ -201,15 +220,19 @@ const resolvers = {
     Mutation: {
         signUp: async (_, { input }, { db }) => {
             const hashedPassword = bcrypt.hashSync(input.password);
+
+            const currentdate = new Date();
+            const datetime = currentdate.getMonth()+1 + "/" + currentdate.getDay()
+                + "/" + currentdate.getFullYear() + " @ "
+                + currentdate.getHours() + ":"
+                + currentdate.getMinutes() + ":" + currentdate.getSeconds();
                 
             const newUser = {
                 ...input,
                 password: hashedPassword,
-                $currentDate: {
-                    signUpDate: true,
-                    lastUpdated: true
-                }
-                
+                role: "TASKER",
+                signUpDate: datetime,
+                lastUpdated: datetime
             }
 
             //save to database
@@ -244,30 +267,88 @@ const resolvers = {
         },
 
         updateUser: async (_, {input}, { db, user}) => {
+            //check if user tying to update exists in the db
+            const updateUser = await db.collection('Users').findOne({ _id: ObjectId(input.id) });
 
-            const result = await db.collection('Users').updateOne({ _id: input.id},
-                
-            );
-            const someId = result.upsertedID;
-            const updatedUser = await db.collection('Users').findOne({ _id: someId });
-
-            return {
-                id: someId,
-                firstName: updatedUser.firstName,
-                middleName: updatedUser.middleName,
-                lastName: updatedUser.lastName,
-                email: updatedUser.email,
-                company: Company,
-                roles: [Role],
-                avatar: updatedUser.avatar,
-                bio: updatedUser.bio,
-                phone: updatedUser.phone,
-                assignedJobs: [Job],
-                address: Address,
-                schedual: updatedUser.schedual,
-                signUpDate: updatedUser.signUpDate,
-                lastModDate: updatedUser.lastModDate
+            if(!updateUser) {
+                throw new Error('The user you are trying to update does not exist.')
             }
+            //get the active users role
+            const activeRole = user.role;
+            //get update user role
+            const updateRole = updateUser.role;
+            //check if user is updating self or other
+            const updatingSelf = updateUser._id.equals(user._id);
+            console.log(updatingSelf);
+            console.log(updateUser._id);
+            console.log(user._id);
+            //check if user has permission to update the user they want to update
+            //should not be able to update their own role or other users personal info 
+            //if the person they are trying to update is a higher role then they are
+            if(updatingSelf && input.role != null){
+                throw new Error('Can not update own user role.');
+            }
+            let canUpdate = true;
+            if (!updatingSelf && (activeRole == 'TASKER' || activeRole == updateRole)){
+                canUpdate = false;
+            }
+            if (!updatingSelf && (activeRole== 'JOB_MANAGER' && (updateRole == 'COMPANY_MANAGER' || updateRole == 'SYSTEM_MANAGER'))){
+                canUpdate = false;
+            }
+            if (!updatingSelf && (activeRole == 'COMPANY_MANAGER' && updateRole == 'SYSTEM_MANAGER')) {
+                canUpdate = false;
+            }
+            if(!canUpdate){
+                throw new Error('Can not update user of same or higher role than you.')
+            }
+
+            const currentdate = new Date();
+            const datetime = currentdate.getDay() + "/" + currentdate.getMonth()
+                + "/" + currentdate.getFullYear() + " @ "
+                + currentdate.getHours() + ":"
+                + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+            
+            // try {
+                const result = await db.collection('Users').updateOne({ _id: ObjectId(input.id)},
+                    {$set: {name: {first: input.name.first, middle: input.name.middle, last: input.name.last}, 
+                        avatar: input.avatar, 
+                        bio: input.bio,
+                        phone: input.phone,
+                        address: {
+                            street: input.address.street,
+                            city: input.address.city,
+                            state: input.address.state,
+                            zip: input.address.zip
+                        },
+                        schedual: input.schedual,
+                        role: input.role,
+                        lastUpdated: datetime
+                    }
+                });
+
+                const updatedUser = await db.collection('Users').findOne({ _id: updateUser._id });
+                console.log(updatedUser.name.last);
+    
+                return {
+                    code: result.acknowledged,
+                    success: true,
+                    message: "Successfully updated user",
+                    user: {
+                            id: updateUser._id,
+                            name: {
+                                first: updatedUser.name.first,
+                                middle: updatedUser.name.middle,
+                                last: updatedUser.name.last
+                            },
+                            email: updatedUser.email,
+                            role: updatedUser.role,
+                            signUpDate: updatedUser.signUpDate,
+                            lastModDate: updatedUser.lastModDate
+                            }
+                }
+            // } catch (error) {
+            //     throw new Error(error);
+            // }
         },
 
         createCompany: async (_, { input }, { db, user }) => {
