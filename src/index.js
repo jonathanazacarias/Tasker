@@ -27,6 +27,9 @@ const getUserFromToken = async (token, db) => {
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
 }
 
+//import all of the schema types
+const {User: typeDef, userResolvers: resolvers} = require('./schema models/User');
+
 const typeDefs = gql`
     type User {
         id: ID!
