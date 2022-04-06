@@ -182,6 +182,11 @@ const typeDefs = gql`
         role: RoleTypes!
     }
 
+    input UpdateUserPasswordInput {
+        email: String!
+        password: String!
+    }
+
     interface MutationResponse {
         code: String!
         success: Boolean!
@@ -189,25 +194,44 @@ const typeDefs = gql`
     }
 
     type Mutation {
+        #done
         signUp(input: SignUpInput!): AuthUser!
+        #done
         signIn(input: SignInInput!): AuthUser!
 
+        #not done
         createUser(input: SignUpInput!): AuthUser!
 
+        #not done
         updateUser(input: UpdateUserInput!): UpdateUserMutationResponse!
+        #done
         updateUserRole(input: UpdateUserRoleInput!): UpdateUserRoleMutationResponse!
+        #done
+        updateUserPassword(input: UpdateUserPasswordInput): UpdateUserPasswordMutationResponse!
 
+        #done
         createCompany(input: CompanyInput!): Company!
+        #not done
         updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
 
+        #not done
         createLocation(input: LocationInput!): Location!
 
+        #not done
         createJob(input: JobInput!): Job!
 
+        #not done
         createReport(input: ReportInput): Report!
     }
 
     type UpdateUserRoleMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        user: User!
+    }
+
+    type UpdateUserPasswordMutationResponse implements MutationResponse {
         code: String!
         success: Boolean!
         message: String!
@@ -317,6 +341,10 @@ const resolvers = {
                 user: user,
                 token: getToken(user),
             }
+        },
+
+        createUser: async (_, { input }, { db }) => {
+
         },
 
         updateUser: async (_, {input}, { db, user}) => {
@@ -450,18 +478,7 @@ const resolvers = {
                     code: "200",
                     success: true,
                     message: "Successfully updated user",
-                    user: {
-                        id: updatedUser._id,
-                        name: {
-                            first: updatedUser.name.first,
-                            middle: updatedUser.name.middle,
-                            last: updatedUser.name.last
-                        },
-                        email: updatedUser.email,
-                        role: updatedUser.role,
-                        signUpDate: updatedUser.signUpDate,
-                        lastUpdated: updatedUser.lastUpdated
-                    }
+                    user: updatedUser
                 }
             } catch (error) {
                 
@@ -469,10 +486,45 @@ const resolvers = {
             
         },
 
+        updateUserPassword: async (_, { input }, { db }) => {
+            //check if user trying to update exists in the db
+            if (await db.collection('Users').findOne({ email: input.email }) == null) {
+                throw new Error('The user you are trying to update does not exist.')
+            }
+            //encrypt password
+            const hashedPassword = bcrypt.hashSync(input.password);
+            //get datetime
+            const datetime = getDateTime();
+
+            try {
+                await db.collection('Users').updateOne({ email: input.email },
+                    {
+                        $set: {
+                            password: hashedPassword,
+                            lastUpdated: datetime
+                        }
+                    });
+                const updatedUser = await db.collection('Users').findOne({ emai: input.email });
+
+                return {
+                    code: "200",
+                    success: true,
+                    message: "Successfully updated user",
+                    user: updatedUser
+                }
+            } catch (error) {
+
+            }
+        },
+
         createCompany: async (_, { input }, { db, user }) => {
             //make sure user is authenticated
             if (!user) {
                 throw new Error('Authentication Error. Please Sign In.')
+            }
+            //make sure user can create a company
+            if (user.role != 'SYSTEM_MANAGER') {
+                throw new Error('You are not authorized to create a company');
             }
 
             const newCompany = {
