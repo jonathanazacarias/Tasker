@@ -1,5 +1,5 @@
 //imports
-const { ApolloServer, gql } = require('apollo-server');
+const { ApolloServer, printShema, gql } = require('apollo-server');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 //bcrypt for password encryption
 const bcrypt = require('bcryptjs');
@@ -25,6 +25,23 @@ const getUserFromToken = async (token, db) => {
     if (!tokenData?.id) { return null }
     //find and return the user with the matching id from the db
     return await db.collection('Users').findOne({ _id: ObjectId(tokenData.id) });
+}
+//function to get datetime signature
+const getDateTime = () => {
+    const currentdate = new Date();
+    const weekday = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let day = weekday[currentdate.getDay()];
+    const datetime = day + ", " + (currentdate.getMonth() + 1) + "/" + currentdate.getDate()
+        + "/" + currentdate.getFullYear() + " @ "
+        + currentdate.getHours() + ":"
+        + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+    return datetime;
+}
+
+//function to get user rank
+const getUserRank = (role) => {
+    const userDict = ['SYSTEM_MANAGER', 'COMPANY_MANAGER', 'JOB_MANAGER', 'TASKER'];
+    return userDict.indexOf(role);
 }
 
 const typeDefs = gql`
@@ -110,6 +127,13 @@ const typeDefs = gql`
         complete: Boolean!
     }
 
+    input ReportInput {
+        jobId: ID!
+        jobDateTime: String!
+        completionPercent: Int!
+        complete: Boolean!
+    }
+
     type Job {
         id: ID!
         name: String!
@@ -153,14 +177,65 @@ const typeDefs = gql`
         name: String
     }
 
+    input UpdateUserRoleInput {
+        targetUser: String!
+        role: RoleTypes!
+    }
+
+    input UpdateUserPasswordInput {
+        email: String!
+        password: String!
+    }
+
+    interface MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+    }
+
     type Mutation {
+        #done
         signUp(input: SignUpInput!): AuthUser!
+        #done
         signIn(input: SignInInput!): AuthUser!
 
-        updateUser(input: UpdateUserInput!): UpdateUserMutationResponse!
+        #not done
+        createUser(input: SignUpInput!): AuthUser!
 
+        #not done
+        updateUser(input: UpdateUserInput!): UpdateUserMutationResponse!
+        #done
+        updateUserRole(input: UpdateUserRoleInput!): UpdateUserRoleMutationResponse!
+        #done
+        updateUserPassword(input: UpdateUserPasswordInput): UpdateUserPasswordMutationResponse!
+
+        #done
         createCompany(input: CompanyInput!): Company!
+        #not done
         updateCompany(input: UpdateCompanyInput!): UpdateCompanyMutationResponse!
+
+        #not done
+        createLocation(input: LocationInput!): Location!
+
+        #not done
+        createJob(input: JobInput!): Job!
+
+        #not done
+        createReport(input: ReportInput): Report!
+    }
+
+    type UpdateUserRoleMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        user: User!
+    }
+
+    type UpdateUserPasswordMutationResponse implements MutationResponse {
+        code: String!
+        success: Boolean!
+        message: String!
+        user: User!
     }
 
     type UpdateCompanyMutationResponse implements MutationResponse {
@@ -190,12 +265,6 @@ const typeDefs = gql`
         password: String!
     }
 
-    interface MutationResponse {
-        code: String!
-        success: Boolean!
-        message: String!
-    }
-
     # QUERY TYPES
     type Query {
         myJobs: [Job!]!
@@ -223,13 +292,17 @@ const resolvers = {
 
     Mutation: {
         signUp: async (_, { input }, { db }) => {
+            //check if user with that email already exists
+            const userCheck = await db.collection('Users').findOne({ email: input.email });
+            if (userCheck) {
+                throw new Error('A user with that email address already exists!');
+            }
+
+            //encrypt password
             const hashedPassword = bcrypt.hashSync(input.password);
 
-            const currentdate = new Date();
-            const datetime = currentdate.getMonth()+1 + "/" + currentdate.getDay()
-                + "/" + currentdate.getFullYear() + " @ "
-                + currentdate.getHours() + ":"
-                + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+            //get datetime
+            const datetime = getDateTime();
                 
             const newUser = {
                 ...input,
@@ -270,6 +343,10 @@ const resolvers = {
             }
         },
 
+        createUser: async (_, { input }, { db }) => {
+
+        },
+
         updateUser: async (_, {input}, { db, user}) => {
             //check if user tying to update exists in the db
             const updateUser = await db.collection('Users').findOne({ _id: ObjectId(input.id) });
@@ -306,11 +383,8 @@ const resolvers = {
                 throw new Error('Can not update user of same or higher role than you.')
             }
 
-            const currentdate = new Date();
-            const datetime = currentdate.getDay() + "/" + currentdate.getMonth()
-                + "/" + currentdate.getFullYear() + " @ "
-                + currentdate.getHours() + ":"
-                + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+            //get datetime
+            const datetime = getDateTime();
             
             // try {
                 const result = await db.collection('Users').updateOne({ _id: ObjectId(input.id)},
@@ -355,10 +429,102 @@ const resolvers = {
             // }
         },
 
+        updateUserRole: async (_, { input }, {db, user}) => {
+            const currentUserID = user._id;
+            const targetUserID = ObjectId(input.targetUser);
+            const currentUserRank = getUserRank(user.role);
+            const targetUser = await db.collection('Users').findOne({ _id: targetUserID });
+            const targetUserRank = getUserRank(targetUser.role);
+
+            //check if anyone is signed in
+            if (!user) {
+                throw new Error('Authentication Error. Please Sign In.')
+            }
+            //check if target user exists
+            if (!targetUser) {
+                throw new Error('The user you are trying to update does not exist.');
+            }
+            //if any user rank is -1 then user role is invalid
+            if (targetUserRank < 0 || currentUserRank < 0) {
+                throw new Error('Users have invalid user roles');
+            }
+            //user can not update own role
+            if (currentUserID.equals(targetUserID)) {
+                throw new Error('You can not update your own user role.')
+            }
+            //if user is a TASKER the can not update any user role
+            if (currentUserRank == 3) {
+                throw new Error('You are not authorized to update user roles.');
+            }
+            //user can not update a user of higher rank
+            if (targetUserRank <= currentUserRank) {
+                throw new Error('You are not authorized to update this user.')
+            }
+
+            //get datetime
+            const datetime = getDateTime();
+
+            try {
+                await db.collection('Users').updateOne({ _id: targetUserID },
+                    {
+                        $set: {
+                            role: input.role,
+                            lastUpdated: datetime
+                        }
+                    });
+                const updatedUser = await db.collection('Users').findOne({ _id: targetUserID });
+    
+                return {
+                    code: "200",
+                    success: true,
+                    message: "Successfully updated user",
+                    user: updatedUser
+                }
+            } catch (error) {
+                
+            }
+            
+        },
+
+        updateUserPassword: async (_, { input }, { db }) => {
+            //check if user trying to update exists in the db
+            if (await db.collection('Users').findOne({ email: input.email }) == null) {
+                throw new Error('The user you are trying to update does not exist.')
+            }
+            //encrypt password
+            const hashedPassword = bcrypt.hashSync(input.password);
+            //get datetime
+            const datetime = getDateTime();
+
+            try {
+                await db.collection('Users').updateOne({ email: input.email },
+                    {
+                        $set: {
+                            password: hashedPassword,
+                            lastUpdated: datetime
+                        }
+                    });
+                const updatedUser = await db.collection('Users').findOne({ emai: input.email });
+
+                return {
+                    code: "200",
+                    success: true,
+                    message: "Successfully updated user",
+                    user: updatedUser
+                }
+            } catch (error) {
+
+            }
+        },
+
         createCompany: async (_, { input }, { db, user }) => {
             //make sure user is authenticated
             if (!user) {
                 throw new Error('Authentication Error. Please Sign In.')
+            }
+            //make sure user can create a company
+            if (user.role != 'SYSTEM_MANAGER') {
+                throw new Error('You are not authorized to create a company');
             }
 
             const newCompany = {
@@ -374,7 +540,7 @@ const resolvers = {
                 name: company.name
             }
 
-        }
+        },
 
     }
 
