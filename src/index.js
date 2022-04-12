@@ -269,6 +269,7 @@ const typeDefs = gql`
     type Query {
         myJobs: [Job!]!
         getUserRole: String!
+        getUsers: [User!]!
     }
 `;
 
@@ -287,6 +288,14 @@ const resolvers = {
         myJobs: () => [],
         getUserRole: async (_, { input }, { user }) => {
             return user.role;
+        },
+        getUsers: async(_, {input}, { db, user }) => {
+            //if no user is signed in then no return
+            if(!user) {
+                throw new Error('No user signed in.');
+            }
+
+            return await db.collection('Users');
         }
     },
 
