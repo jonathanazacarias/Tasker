@@ -1,0 +1,8 @@
+mutation signin($input: SignInInput!) {
+  signIn(input: $input) {
+    user {
+      email
+    }
+
+  }
+}

@@ -292,56 +292,72 @@ const resolvers = {
 
     Mutation: {
         signUp: async (_, { input }, { db }) => {
-            //check if user with that email already exists
-            const userCheck = await db.collection('Users').findOne({ email: input.email });
-            if (userCheck) {
-                throw new Error('A user with that email address already exists!');
-            }
+                    //check if user with that email already exists
+                    const userCheck = await db.collection('Users').findOne({ email: input.email });
+                    if (userCheck) {
+                        throw new Error('A user with that email address already exists!');
+                    }
 
-            //encrypt password
-            const hashedPassword = bcrypt.hashSync(input.password);
+                    //encrypt password
+                    const hashedPassword = bcrypt.hashSync(input.password);
 
-            //get datetime
-            const datetime = getDateTime();
-                
-            const newUser = {
-                ...input,
-                password: hashedPassword,
-                role: "TASKER",
-                signUpDate: datetime,
-                lastUpdated: datetime
-            }
+                    //get datetime
+                    const datetime = getDateTime();
 
-            //save to database
-            const result = await db.collection('Users').insertOne(newUser);
-            const someId = result.insertedId;
-            const user = await db.collection('Users').findOne({ _id: someId });
-            return {
-                user: user,
-                token: getToken(user),
-            };
+                    const newUser = {
+                        ...input,
+                        password: hashedPassword,
+                        role: "TASKER",
+                        signUpDate: datetime,
+                        lastUpdated: datetime
+                    }
 
-        },
+                    //save to database
+                    const result = await db.collection('Users').insertOne(newUser);
+                    const someId = result.insertedId;
+                    const user = await db.collection('Users').findOne({ _id: someId });
+                    return {
+                        user: user,
+                        token: getToken(user),
+                    };
+
+                },
+        createJob: async (_, { input }, { db }) => {
+
+                    const newUser = {
+                        ...input
+                    }
+
+                    //save to database
+                    const result = await db.collection('Jobs').insertOne(newUser);
+                    const someId = result.insertedId;
+                    const user = await db.collection('Jobs').findOne({ _id: someId });
+                    return {
+                        job: "job",
+                    };
+
+                },
 
         signIn: async (_, { input }, { db }) => {
-            const user = await db.collection('Users').findOne({ email: input.email });
+                    const user = await db.collection('Users').findOne({ email: input.email });
 
-            //check if user email exists in the database
-            if (!user) {
-                throw new Error('Invalid credentials!');
-            }
+                    //check if user email exists in the database
+                    if (!user) {
+                        throw new Error('Invalid credentials!');
+                    }
 
-            //check if password is correct
-            const isPasswordCorrect = bcrypt.compareSync(input.password, user.password);
-            if (!isPasswordCorrect) {
-                throw new Error('Invalid credentials!')
-            }
-
-            return {
-                user: user,
-                token: getToken(user),
-            }
-        },
+                    //check if password is correct
+                    const isPasswordCorrect = bcrypt.compareSync(input.password, user.password);
+                    if (!isPasswordCorrect) {
+                        throw new Error('Invalid credentials!')
+                    }
+                    const jobs = db.collection('Jobs').find({reportRecipiants: user.name});
+                    return {
+                        jobs:jobs,
+                        user: user,
+                        token: getToken(user),
+                    }
+                },
 
         createUser: async (_, { input }, { db }) => {
 

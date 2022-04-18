@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.view.Menu;
+import android.widget.Button;
 import android.widget.ImageSwitcher;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -26,6 +27,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.functions.Consumer;
 import io.reactivex.schedulers.Schedulers;
+import kotlinx.coroutines.Job;
 import retrofit2.Retrofit;
 
 public class MainActivity extends AppCompatActivity {
@@ -34,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     CompositeDisposable compositeDisposable = new CompositeDisposable();
     IMyService iMyService;
+
+    Button btn_job1;
+    Button btn_job2;
+    Button btn_job3;
+
 
 
     @Override
@@ -49,6 +56,18 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+
+        btn_job1 = (Button) findViewById(R.id.job1);
+//        if(btn_job1!=null) {
+            btn_job1.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+
+                    sendToJob();
+
+                }
+            });
+//        }
         setSupportActionBar(binding.appBarMain.toolbar);
         binding.appBarMain.fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -89,6 +108,12 @@ public class MainActivity extends AppCompatActivity {
 
     public void sendToCreateJob(){
         Intent intent = new Intent(this, CreateJob.class);
+//                        EditText editText = (EditText) findViewById(R.id.editTextTextPersonName);
+//                        String message = editText.getText().toString();
+//                        intent.putExtra(EXTRA_MESSAGE, message);
+        startActivity(intent);
+    } public void sendToJob(){
+        Intent intent = new Intent(this, Report.class);
 //                        EditText editText = (EditText) findViewById(R.id.editTextTextPersonName);
 //                        String message = editText.getText().toString();
 //                        intent.putExtra(EXTRA_MESSAGE, message);

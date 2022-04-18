@@ -17,6 +17,15 @@
         app:met_textColorHint="@color/myTextColor"
         app:met_baseColor="@color/myTextColor"
         app:met_primaryColor="@color/myTextColor"/>
+    <com.rengwuxian.materialedittext.MaterialEditText
+        android:id="@+id/edt_rec"
+        android:hint="Recipient"
+        android:inputType="textCapWords"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:met_textColorHint="@color/myTextColor"
+        app:met_baseColor="@color/myTextColor"
+        app:met_primaryColor="@color/myTextColor"/>
 
     <com.rengwuxian.materialedittext.MaterialEditText
         android:id="@+id/edt_location"

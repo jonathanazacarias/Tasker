@@ -17,6 +17,9 @@
             android:name=".CreateJob"
             android:exported="false" />
         <activity
+            android:name=".Report"
+            android:exported="false" />
+        <activity
             android:name=".Login"
             android:exported="true"
             android:label="Tasker"

@@ -11,28 +11,47 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
         android:layout_marginEnd="8dp"
         android:textAlignment="center"
         android:textSize="20sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="1.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/job3"
+        app:layout_constraintVertical_bias="0.271" />
+
+    <Button
+        android:id="@+id/job1"
+        android:layout_width="364dp"
+        android:layout_height="93dp"
+        android:layout_marginTop="52dp"
+        android:text="1260 E Lugonia Ave \n Cleaning "
+        android:color="@color/white"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.489"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <TextView
-        android:id="@+id/text_gallery"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp"
-        android:textAlignment="center"
-        android:textSize="20sp"
-        app:layout_constraintBottom_toBottomOf="parent"
+    <Button
+        android:id="@+id/job2"
+        android:layout_width="364dp"
+        android:layout_height="93dp"
+        android:layout_marginTop="11dp"
+        android:text="1200 E Colton Ave \n Teaching "
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintHorizontal_bias="0.489"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.538" />
+        app:layout_constraintTop_toBottomOf="@+id/job1" />
+
+    <Button
+        android:id="@+id/job3"
+        android:layout_width="364dp"
+        android:layout_height="93dp"
+        android:layout_marginTop="12dp"
+        android:text="1439 Martin St \n Inspection "
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.489"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/job2" />
 </androidx.constraintlayout.widget.ConstraintLayout>
